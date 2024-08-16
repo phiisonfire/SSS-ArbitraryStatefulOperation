@@ -1,3 +1,4 @@
-[debug] not up to date. inChanged = true, force = false
-[debug] Updating ProjectRef(uri("file:/D:/projects/SparkStructuredStreaming/"), "root")...
-[debug] Done updating ProjectRef(uri("file:/D:/projects/SparkStructuredStreaming/"), "root")
+[warn] scala-library-2.13.14-sources.jar no longer exists at /C:/Users/nguye/AppData/Local/Coursier/Cache/v1/https/repo1.maven.org/maven2/org/scala-lang/scala-library/2.13.14/scala-library-2.13.14-sources.jar
+[debug] not up to date. inChanged = false, force = false
+[debug] Updating ProjectRef(uri("file:/home/phinguyen/projects/SSS-ArbitraryStatefulOperation/"), "root")...
+[debug] Done updating ProjectRef(uri("file:/home/phinguyen/projects/SSS-ArbitraryStatefulOperation/"), "root")
