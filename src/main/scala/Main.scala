@@ -1,7 +1,9 @@
 package de.phinguyen.sparkstructuredstreaming
 
+import org.apache.spark.sql.functions.{col, from_json}
 import org.apache.spark.sql.{Dataset, SparkSession}
 import org.apache.spark.sql.streaming.{GroupState, GroupStateTimeout, OutputMode}
+import org.apache.spark.sql.types.{LongType, StringType, StructField, StructType, TimestampType}
 
 import java.time.{Duration, Instant}
 import scala.collection.mutable.ListBuffer
@@ -40,7 +42,7 @@ object Main {
 
   def removeExpiredRecords(latestTimestamp: java.time.Instant,state: PurchaseCountState) = {
     // val latestTimestamp = state.latestTimeStamp
-    val expirationDuration = Duration.ofMinutes(5)
+    val expirationDuration = Duration.ofMinutes(1)
     val filterPurchases = state.currentPurchases.filter( purchase =>
       purchase.transactionTimestamp.isAfter(latestTimestamp.minus(expirationDuration))
     )
@@ -95,34 +97,57 @@ object Main {
   }
 
   def main(args: Array[String]) = {
-    // Import implicits for Encoders
-    // Spark automatically creates Encoder for case classes
-    // in this situation, Spark creates Encoder[InputRow]
-    // Encoders are necessary because they define how the JVM objects are serialized and deserialzed when working with DataFrames and DataSets
-    import spark.implicits._
 
     val spark = SparkSession.builder()
       .master("local[4]")
       .appName("SSS-ArbitraryStatefulProcessing")
       .getOrCreate()
 
-    val kafkaInputDS = spark
+    // Import implicits for Encoders
+    // Spark automatically creates Encoder for case classes
+    // in this situation, Spark creates Encoder[InputRow]
+    // Encoders are necessary because they define how the JVM objects are serialized and deserialzed when working with DataFrames and DataSets
+    import spark.implicits._
+
+    val kafkaRawInputDF = spark
       .readStream
       .format("kafka")
       .option("kafka.bootstrap.servers", "localhost:9092")
       .option("subscribe", "user-transaction-topic")
-      .option("startingOffsets", "latest")
+      .option("startingOffsets", "earliest")
+      .option("group.id")
       .load() // this load the whole kafka messages and their metadata
-      .selectExpr("userId", "cast(transactionTimestamp as timestamp) transactionTimestamp")
+
+    // Define the schema for parsing the value of messages (JSON String)
+    val schema = StructType(Seq(
+      StructField("userId", LongType, true),
+      StructField("transactionTimestamp", StringType, true)
+    ))
+
+    val kafkaParsedInputDS = kafkaRawInputDF
+      .selectExpr("CAST(value AS STRING) as value")
+      .select(from_json(col("value"), schema).as("json_data"))
+      .select("json_data.userId", "json_data.transactionTimestamp")
+      .withColumn("transactionTimestamp", col("transactionTimestamp").cast(TimestampType))
       .as[InputRow]
 
-    val resultDS: Dataset[PurchaseCount] = kafkaInputDS
+    val resultDS: Dataset[PurchaseCount] = kafkaParsedInputDS
       .withWatermark("transactionTimestamp", "30 seconds")
       .groupByKey(_.userId)
       .flatMapGroupsWithState(OutputMode.Append(), GroupStateTimeout.EventTimeTimeout())(updateState)
 
+    val csvOutputFilePath = "./data/streaming-outputs"
+    val checkpointPath = "./data/checkpoints"
     // recommend convert resultDS to DataFrame
     // sink: Kafka, Delta, foreachBatch
+    resultDS.writeStream
+      .format("csv")
+      .option("path", csvOutputFilePath)
+      .option("checkpointLocation", checkpointPath)
+      .option("header", "true")
+      .outputMode("append")
+      .start()
+      .awaitTermination()
 
   }
 
