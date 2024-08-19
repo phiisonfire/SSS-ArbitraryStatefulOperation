@@ -134,13 +134,14 @@ object Main {
       .as[InputRow] // this transform DataFrame[Row] into Dataset[InputRow]
 
     val resultDS: Dataset[PurchaseCount] = kafkaParsedInputDS
-      .withWatermark("transactionTimestamp", "30 seconds")
+      .withWatermark("transactionTimestamp", "30 seconds") // support event-time timeout in flatMapGroupsWithState
       .groupByKey(_.userId)
       .flatMapGroupsWithState(OutputMode.Append(), GroupStateTimeout.EventTimeTimeout())(updateState)
 
     resultDS.printSchema()
 
     // Sink the result to Cassandra
+    /*
     resultDS.writeStream
       .foreachBatch { (batchDF: Dataset[PurchaseCount], batchId: Long) =>
         batchDF.write
@@ -152,36 +153,16 @@ object Main {
       .outputMode("append")
       .start()
       .awaitTermination()
-
-    /*
-    val csvOutputFilePath = "./data/streaming-outputs"
-    val checkpointPath = "./data/checkpoints"
-
-    // recommend convert resultDS to DataFrame
-    // sink: Kafka, Delta, foreachBatch
+    */
     resultDS.writeStream
-      .format("csv")
-      .option("path", csvOutputFilePath)
-      .option("checkpointLocation", checkpointPath)
-      .option("header", "true")
+      .format("org.apache.spark.sql.cassandra")
+      .options(Map(
+        "table" -> "user_transaction_counts",
+        "keyspace" -> "streaming_demo"
+      ))
       .outputMode("append")
+      .option("checkpointLocation", "./data/checkpoints")
       .start()
       .awaitTermination()
-
-    */
-
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
 }
