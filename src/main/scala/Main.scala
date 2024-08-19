@@ -1,5 +1,6 @@
 package de.phinguyen.sparkstructuredstreaming
 
+import org.apache.spark.sql.cassandra.DataFrameWriterWrapper
 import org.apache.spark.sql.functions.{col, from_json}
 import org.apache.spark.sql.{Dataset, SparkSession}
 import org.apache.spark.sql.streaming.{GroupState, GroupStateTimeout, OutputMode}
@@ -101,6 +102,8 @@ object Main {
     val spark = SparkSession.builder()
       .master("local[4]")
       .appName("SSS-ArbitraryStatefulProcessing")
+      .config("spark.cassandra.connection.host", "localhost")
+      .config("spark.cassandra.connection.port", "9042")
       .getOrCreate()
 
     // Import implicits for Encoders
@@ -128,15 +131,32 @@ object Main {
       .select(from_json(col("value"), schema).as("json_data"))
       .select("json_data.userId", "json_data.transactionTimestamp")
       .withColumn("transactionTimestamp", col("transactionTimestamp").cast(TimestampType))
-      .as[InputRow]
+      .as[InputRow] // this transform DataFrame[Row] into Dataset[InputRow]
 
     val resultDS: Dataset[PurchaseCount] = kafkaParsedInputDS
       .withWatermark("transactionTimestamp", "30 seconds")
       .groupByKey(_.userId)
       .flatMapGroupsWithState(OutputMode.Append(), GroupStateTimeout.EventTimeTimeout())(updateState)
 
+    resultDS.printSchema()
+
+    // Sink the result to Cassandra
+    resultDS.writeStream
+      .foreachBatch { (batchDF: Dataset[PurchaseCount], batchId: Long) =>
+        batchDF.write
+          .cassandraFormat("user_transaction_counts", "streaming_demo")
+          .mode("append")
+          .save()
+      }
+      .option("checkpointLocation", "./data/checkpoints")
+      .outputMode("append")
+      .start()
+      .awaitTermination()
+
+    /*
     val csvOutputFilePath = "./data/streaming-outputs"
     val checkpointPath = "./data/checkpoints"
+
     // recommend convert resultDS to DataFrame
     // sink: Kafka, Delta, foreachBatch
     resultDS.writeStream
@@ -147,6 +167,9 @@ object Main {
       .outputMode("append")
       .start()
       .awaitTermination()
+
+    */
+
   }
 
 

@@ -1,3 +1,0 @@
-v1
-{"path":"file:///home/phinguyen/Projects/SSS-ArbitraryStatefulOperation/data/streaming-outputs/part-00000-e80e78dc-b145-412d-888d-d95c774e0542-c000.csv","size":46,"isDir":false,"modificationTime":1724003467349,"blockReplication":1,"blockSize":33554432,"action":"add"}
-{"path":"file:///home/phinguyen/Projects/SSS-ArbitraryStatefulOperation/data/streaming-outputs/part-00110-c6a73ba3-b24d-4a6a-8779-2c51d0cf51e0-c000.csv","size":88,"isDir":false,"modificationTime":1724003467873,"blockReplication":1,"blockSize":33554432,"action":"add"}

@@ -18,7 +18,7 @@ object TransactionProducer {
     val producer = new KafkaProducer[String, String](props)
 
     val topic = "user-transaction-topic"
-    val userIds = (1L to 10000L).toList // simulate 10000 users
+    val userIds = (1L to 100L).toList // simulate 10000 users
 
     while (true) {
       // Generate a random transaction for a random user
