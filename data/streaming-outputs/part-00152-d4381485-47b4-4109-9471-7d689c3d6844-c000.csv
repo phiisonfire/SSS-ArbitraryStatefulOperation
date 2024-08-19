@@ -1,0 +1,3 @@
+userId,purchaseCount,eventTimestamp,isTimeout
+4350,1,2024-08-19T00:50:23.008+07:00,false
+9867,0,2024-08-19T00:50:23.967+07:00,true

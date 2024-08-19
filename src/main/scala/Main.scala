@@ -21,11 +21,11 @@ object Main {
   * */
 
   // Define data structures - what goes in, what is stored (in state, between micro-batches), what comes out (emit).
-  case class InputRow(userId: Long,
+  case class InputRow(userId: String,
                       transactionTimestamp: java.time.Instant)
   case class PurchaseCountState(latestTimeStamp: java.time.Instant,
                                 currentPurchases: List[InputRow])
-  case class PurchaseCount(userId: Long,
+  case class PurchaseCount(userId: String,
                            purchaseCount: Integer,
                            eventTimestamp: java.time.Instant,
                            isTimeout: Boolean)
@@ -52,7 +52,7 @@ object Main {
   // Function (with a specific set of parameters) that will be executed by `flatMapGroupWithState`
   // 1st parameter ~ grouping key = the column from the streaming DataFrame being group on
 
-  def updateState(userId: Long,
+  def updateState(userId: String,
                   values: Iterator[InputRow],
                   state: GroupState[PurchaseCountState]
                  ): Iterator[PurchaseCount] = {
@@ -114,14 +114,13 @@ object Main {
       .format("kafka")
       .option("kafka.bootstrap.servers", "localhost:9092")
       .option("subscribe", "user-transaction-topic")
-      .option("startingOffsets", "earliest")
-      .option("group.id")
+      .option("startingOffsets", "latest")
       .load() // this load the whole kafka messages and their metadata
 
     // Define the schema for parsing the value of messages (JSON String)
     val schema = StructType(Seq(
-      StructField("userId", LongType, true),
-      StructField("transactionTimestamp", StringType, true)
+      StructField("userId", StringType, false),
+      StructField("transactionTimestamp", StringType, false)
     ))
 
     val kafkaParsedInputDS = kafkaRawInputDF
@@ -148,7 +147,6 @@ object Main {
       .outputMode("append")
       .start()
       .awaitTermination()
-
   }
 
 
